@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Satış & Stok Takip Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for Excel import/export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* Glassmorphism effects */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .dark .glass-nav {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        /* Hide scrollbars for app-like clean UI */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Active navigation indicator animation */
+        .nav-item {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .nav-item.active {
+            color: #6366f1;
+            transform: translateY(-2px);
+        }
+        .nav-item.active i {
+            transform: scale(1.15);
+        }
+
+        /* Custom pulsing effect for low stock */
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .pulse-warning {
+            animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen pb-24 transition-colors duration-300">
+
+    <!-- Top Header -->
+    <header class="sticky top-0 z-40 glass-nav border-b border-slate-200/50 dark:border-slate-800/50 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-[#000] fa-chart-line text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base leading-tight">SatışPro Mobile</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="currentMonthYear">Haziran 2026</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- PWA Install Button -->
+            <button id="pwaInstallBtn" onclick="openPwaModal()" class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs font-semibold flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800/50 active:scale-95 transition-transform">
+                <i class="fa-solid fa-download"></i>
+                <span class="hidden sm:inline">APK / Yükle</span>
+            </button>
+            <!-- Theme Toggle -->
+            <button onclick="toggleTheme()" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 active:scale-95 transition-transform">
+                <i id="themeIcon" class="fa-solid fa-moon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="p-4 max-w-5xl mx-auto space-y-5">
+
+        <!-- VIEW 1: DASHBOARD -->
+        <div id="view-dashboard" class="space-y-5">
+
+            <!-- Target & Target Progress Card -->
+            <div class="glass-card rounded-3xl p-5 relative overflow-hidden shadow-sm">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Aylık Satış Hedefi</span>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <h2 class="text-2xl font-black" id="dashSalesCount">0</h2>
+                            <span class="text-slate-500 text-xs" id="dashTargetCount">/ 0 Adet</span>
+                        </div>
+                    </div>
+                    <button onclick="openTargetModal()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-500 active:scale-95 transition">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs font-semibold">
+                        <span class="text-slate-500">İlerleme Oranı</span>
+                        <span id="targetPercent" class="text-indigo-600 dark:text-indigo-400">%0</span>
+                    </div>
+                    <div class="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5">
+                        <div id="targetProgressBar" class="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-700 w-0"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI Cards Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <!-- Total Revenue -->
+                <div class="glass-card p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-2 text-sm">
+                        <i class="fa-solid fa-turkish-lira-sign"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Toplam Ciro</p>
+                        <p class="text-lg font-bold mt-0.5 truncate" id="dashRevenue">₺0</p>
+                    </div>
+                </div>
+
+                <!-- Total Commission -->
+                <div class="glass-card p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+                    <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-2 text-sm">
+                        <i class="fa-solid fa-coins"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Tahmini Prim</p>
+                        <p class="text-lg font-bold mt-0.5 text-amber-600 dark:text-amber-400 truncate" id="dashCommission">₺0</p>
+                    </div>
+                </div>
+
+                <!-- Total Remaining Stock -->
+                <div class="glass-card p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+                    <div class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-2 text-sm">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Kalan Stok</p>
+                        <p class="text-lg font-bold mt-0.5 truncate" id="dashTotalStock">0 Adet</p>
+                    </div>
+                </div>
+
+                <!-- Critical Stock Alert -->
+                <div class="glass-card p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+                    <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center mb-2 text-sm">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Kritik Stok</p>
+                        <p class="text-lg font-bold mt-0.5 text-rose-500 truncate" id="dashCriticalStock">0 Ürün</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="space-y-4">
+                <!-- Daily Sales Trend Chart -->
+                <div class="glass-card p-4 rounded-3xl shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-chart-simple text-indigo-500"></i>
+                            Günlük Satış Trendi
+                        </h3>
+                    </div>
+                    <div class="h-56 relative w-full">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Product Sales Share (Pie/Doughnut) -->
+                    <div class="glass-card p-4 rounded-3xl shadow-sm">
+                        <h3 class="font-bold text-sm mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-violet-500"></i>
+                            Ürün Bazlı Satış Dağılımı
+                        </h3>
+                        <div class="h-52 relative w-full flex items-center justify-center">
+                            <canvas id="productPieChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Stock Level Bar Chart -->
+                    <div class="glass-card p-4 rounded-3xl shadow-sm">
+                        <h3 class="font-bold text-sm mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-warehouse text-emerald-500"></i>
+                            Ürün Stok Durumu
+                        </h3>
+                        <div class="h-52 relative w-full">
+                            <canvas id="stockBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- VIEW 2: DAILY SALES ENTRY -->
+        <div id="view-daily" class="hidden space-y-4">
+            
+            <!-- Day Selector Horizontal Scrollbar -->
+            <div class="glass-card p-3 rounded-2xl shadow-sm">
+                <div class="flex justify-between items-center mb-2 px-1">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Gün Seçimi</span>
+                    <span id="selectedDayLabel" class="text-xs font-bold text-indigo-600 dark:text-indigo-400">1. Gün</span>
+                </div>
+                <div id="dayScrollContainer" class="flex gap-2 overflow-x-auto no-scrollbar py-1">
+                    <!-- Days 1-31 generated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Quick Add Products List -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center px-1">
+                    <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300">Ürün Satış Sayıları</h3>
+                    <button onclick="clearDaySales()" class="text-xs text-rose-500 hover:underline font-medium">Bu Günü Sıfırla</button>
+                </div>
+
+                <div id="dailyProductsList" class="space-y-2.5">
+                    <!-- Dynamic Product Cards for Daily Entry -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- VIEW 3: STOCK MANAGEMENT -->
+        <div id="view-stock" class="hidden space-y-4">
+            
+            <div class="flex justify-between items-center px-1">
+                <div>
+                    <h2 class="font-bold text-base">Ürün Kataloğu & Stok</h2>
+                    <p class="text-xs text-slate-500">Ürün fiyat, prim ve stok yönetimi</p>
+                </div>
+                <button onclick="openProductModal()" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-95 transition">
+                    <i class="fa-solid fa-plus"></i>
+                    Yeni Ürün
+                </button>
+            </div>
+
+            <!-- Product Cards List -->
+            <div id="stockProductsList" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- Dynamic Stock Product Cards -->
+            </div>
+
+        </div>
+
+        <!-- VIEW 4: REPORTS & DATA -->
+        <div id="view-reports" class="hidden space-y-4">
+            
+            <!-- Summary Report Card -->
+            <div class="glass-card p-4 rounded-3xl shadow-sm space-y-3">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-file-invoice text-indigo-500"></i>
+                    Aylık Özet Tablo
+                </h3>
+
+                <div class="overflow-x-auto no-scrollbar border border-slate-200 dark:border-slate-800 rounded-2xl">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500">
+                            <tr>
+                                <th class="p-3">Ürün</th>
+                                <th class="p-3 text-center">Satış</th>
+                                <th class="p-3 text-right">Fiyat</th>
+                                <th class="p-3 text-right">Toplam Ciro</th>
+                                <th class="p-3 text-right">Kazanılan Prim</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTableBody" class="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                            <!-- Dynamic Table Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Data Management (Backup, Restore, Excel) -->
+            <div class="glass-card p-4 rounded-3xl shadow-sm space-y-3">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-database text-violet-500"></i>
+                    Veri Yönetimi & Aktarım
+                </h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button onclick="exportToExcel()" class="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold text-xs flex items-center justify-center gap-2 active:scale-95 transition">
+                        <i class="fa-solid fa-file-excel text-base"></i>
+                        Excel (.xlsx) Olarak İndir
+                    </button>
+                    
+                    <button onclick="exportToJson()" class="p-3 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 font-semibold text-xs flex items-center justify-center gap-2 active:scale-95 transition">
+                        <i class="fa-solid fa-file-code text-base"></i>
+                        Yedek Veri İndir (JSON)
+                    </button>
+                    
+                    <label class="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition">
+                        <i class="fa-solid fa-file-import text-base"></i>
+                        Yedek / Excel Yükle
+                        <input type="file" id="importFileInput" accept=".json,.xlsx,.csv" onchange="importData(event)" class="hidden">
+                    </label>
+
+                    <button onclick="resetDataConfirm()" class="p-3 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-semibold text-xs flex items-center justify-center gap-2 active:scale-95 transition">
+                        <i class="fa-solid fa-trash-can text-base"></i>
+                        Tüm Verileri Sıfırla
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation Bar (Mobile Native Style) -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 glass-nav border-t border-slate-200/50 dark:border-slate-800/50 px-3 py-2">
+        <div class="max-w-md mx-auto flex justify-around items-center">
+            
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item active flex flex-col items-center gap-1 text-slate-400 hover:text-indigo-500">
+                <i class="fa-solid fa-chart-pie text-lg"></i>
+                <span class="text-[10px] font-bold">Özet</span>
+            </button>
+
+            <button onclick="switchTab('daily')" id="nav-daily" class="nav-item flex flex-col items-center gap-1 text-slate-400 hover:text-indigo-500">
+                <i class="fa-solid fa-calendar-day text-lg"></i>
+                <span class="text-[10px] font-bold">Günlük Satış</span>
+            </button>
+
+            <button onclick="switchTab('stock')" id="nav-stock" class="nav-item flex flex-col items-center gap-1 text-slate-400 hover:text-indigo-500">
+                <i class="fa-solid fa-boxes-stacked text-lg"></i>
+                <span class="text-[10px] font-bold">Stok Kataloğu</span>
+            </button>
+
+            <button onclick="switchTab('reports')" id="nav-reports" class="nav-item flex flex-col items-center gap-1 text-slate-400 hover:text-indigo-500">
+                <i class="fa-solid fa-file-contract text-lg"></i>
+                <span class="text-[10px] font-bold">Raporlar</span>
+            </button>
+
+        </div>
+    </nav>
+
+    <!-- MODAL 1: Add/Edit Product Modal -->
+    <div id="productModal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-900 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div class="flex justify-between items-center">
+                <h3 id="modalProductTitle" class="font-bold text-lg">Yeni Ürün Ekle</h3>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <form id="productForm" onsubmit="saveProduct(event)" class="space-y-3">
+                <input type="hidden" id="editProductId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Model Adı</label>
+                    <input type="text" id="inputProdName" required placeholder="Örn: N15, R15c, 17TP" class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border-0 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Başlangıç Stoğu</label>
+                        <input type="number" id="inputProdStock" required min="0" value="50" class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border-0 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Kritik Stok Sınırı</label>
+                        <input type="number" id="inputProdMinStock" required min="1" value="5" class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border-0 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Birim Fiyat (₺)</label>
+                        <input type="number" id="inputProdPrice" required min="0" step="0.01" value="10000" class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border-0 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Birim Prim/Komisyon (₺)</label>
+                        <input type="number" id="inputProdCommission" required min="0" step="0.01" value="150" class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border-0 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="pt-2 flex gap-3">
+                    <button type="button" onclick="closeProductModal()" class="w-1/2 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold">İptal</button>
+                    <button type="submit" class="w-1/2 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-lg shadow-indigo-600/30">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Edit Monthly Target Modal -->
+    <div id="targetModal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h3 class="font-bold text-lg">Aylık Hedef Güncelle</h3>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Hedeflenen Toplam Satış (Adet)</label>
+                <input type="number" id="inputMonthlyTarget" min="1" class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border-0 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeTargetModal()" class="w-1/2 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold">İptal</button>
+                <button type="button" onclick="saveTarget()" class="w-1/2 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-lg shadow-indigo-600/30">Güncelle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PWA / APK Installation Guide -->
+    <div id="pwaModal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <i class="fa-brands fa-android text-emerald-500"></i>
+                    APK / Mobil Uygulama Yap
+                </h3>
+                <button onclick="closePwaModal()" class="text-slate-400">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Bu web uygulamasını telefonunuza tam ekran, internetsiz çalışan bir <b>Android APK Uygulaması</b> gibi yükleyebilirsiniz:
+            </p>
+
+            <div class="space-y-2 text-xs">
+                <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 flex items-start gap-3">
+                    <span class="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                    <p>Chrome veya Edge tarayıcısında sağ üstteki <b>Üç Nokta (&vellip;)</b> menüsüne dokunun.</p>
+                </div>
+                <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 flex items-start gap-3">
+                    <span class="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                    <p><b>"Ana ekrana ekle"</b> veya <b>"Uygulamayı yükle"</b> seçeneğini seçin.</p>
+                </div>
+                <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 flex items-start gap-3">
+                    <span class="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                    <p>Artık uygulamanız telefonunuzun uygulama menüsünde yer alacaktır!</p>
+                </div>
+            </div>
+
+            <button onclick="closePwaModal()" class="w-full py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-lg shadow-indigo-600/30">Anladım</button>
+        </div>
+    </div>
+
+    <!-- Notification Toast Message -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold shadow-xl transition-all duration-300 opacity-0 pointer-events-none transform -translate-y-4">
+        İşlem başarıyla gerçekleşti!
+    </div>
+
+    <script>
+        /* Default Models matching user's Excel structure */
+        const DEFAULT_PRODUCTS = [
+            { id: 'p1', name: 'N15', stock: 40, minStock: 5, price: 12500, commission: 150 },
+            { id: 'p2', name: 'N15p', stock: 35, minStock: 5, price: 14000, commission: 180 },
+            { id: 'p3', name: 'N15p5g', stock: 25, minStock: 4, price: 16500, commission: 200 },
+            { id: 'p4', name: 'N15pp', stock: 20, minStock: 3, price: 18500, commission: 220 },
+            { id: 'p5', name: 'R15c', stock: 50, minStock: 10, price: 9500, commission: 120 },
+            { id: 'p6', name: 'R15c5g', stock: 30, minStock: 5, price: 11500, commission: 140 },
+            { id: 'p7', name: 'R15', stock: 45, minStock: 8, price: 13000, commission: 160 },
+            { id: 'p8', name: '15t', stock: 30, minStock: 5, price: 15000, commission: 190 },
+            { id: 'p9', name: '15tp', stock: 20, minStock: 3, price: 17500, commission: 210 },
+            { id: 'p10', name: '17', stock: 15, minStock: 3, price: 21000, commission: 250 },
+            { id: 'p11', name: '17ult', stock: 10, minStock: 2, price: 28000, commission: 350 },
+            { id: 'p12', name: '17T', stock: 15, minStock: 3, price: 23000, commission: 280 },
+            { id: 'p13', name: '17TP', stock: 12, minStock: 2, price: 25000, commission: 300 }
+        ];
+
+        // State variables
+        let appState = {
+            monthlyTarget: 150,
+            selectedDay: 1,
+            products: [],
+            sales: {} // structure: { dayNumber: { productId: count } }
+        };
+
+        let trendChartInstance = null;
+        let pieChartInstance = null;
+        let barChartInstance = null;
+
+        // Initialize App on DOM Loaded
+        window.onload = function() {
+            loadStateFromLocalStorage();
+            renderDaysSelector();
+            renderDailyProducts();
+            renderStockProducts();
+            updateDashboard();
+            initCharts();
+            
+            // Set Dark Mode default
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+            }
+        };
+
+        function loadStateFromLocalStorage() {
+            const savedState = localStorage.getItem('satis_stok_app_state');
+            if (savedState) {
+                try {
+                    appState = JSON.parse(savedState);
+                } catch(e) {
+                    console.error("Local storage load error", e);
+                    appState.products = DEFAULT_PRODUCTS;
+                }
+            } else {
+                appState.products = DEFAULT_PRODUCTS;
+            }
+        }
+
+        function saveStateToLocalStorage() {
+            localStorage.setItem('satis_stok_app_state', JSON.stringify(appState));
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('opacity-0', '-translate-y-4', 'pointer-events-none');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-4', 'pointer-events-none');
+            }, 2500);
+        }
+
+        // Navigation Switcher
+        function switchTab(tabName) {
+            const views = ['dashboard', 'daily', 'stock', 'reports'];
+            views.forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+                document.getElementById(`nav-${v}`).classList.remove('active');
+            });
+
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            document.getElementById(`nav-${tabName}`).classList.add('active');
+
+            if (tabName === 'dashboard') {
+                updateDashboard();
+            } else if (tabName === 'reports') {
+                renderReportsTable();
+            }
+        }
+
+        // Theme Toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('themeIcon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.className = 'fa-solid fa-moon';
+            } else {
+                html.classList.add('dark');
+                icon.className = 'fa-solid fa-sun';
+            }
+            // Refresh charts for theme color adaptation
+            setTimeout(updateCharts, 200);
+        }
+
+        function renderDaysSelector() {
+            const container = document.getElementById('dayScrollContainer');
+            container.innerHTML = '';
+            for (let i = 1; i <= 31; i++) {
+                const btn = document.createElement('button');
+                btn.className = `px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
+                    appState.selectedDay === i 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105' 
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                }`;
+                btn.textContent = `${i}. Gün`;
+                btn.onclick = () => {
+                    appState.selectedDay = i;
+                    document.getElementById('selectedDayLabel').textContent = `${i}. Gün`;
+                    renderDaysSelector();
+                    renderDailyProducts();
+                };
+                container.appendChild(btn);
+            }
+        }
+
+        function renderDailyProducts() {
+            const container = document.getElementById('dailyProductsList');
+            container.innerHTML = '';
+
+            const daySales = appState.sales[appState.selectedDay] || {};
+
+            appState.products.forEach(prod => {
+                const sold = daySales[prod.id] || 0;
+                
+                // Calculate remaining stock considering all sold items across the month
+                const totalSoldInMonth = getTotalSoldForProduct(prod.id);
+                const currentStock = prod.stock - totalSoldInMonth;
+
+                const card = document.createElement('div');
+                card.className = 'glass-card p-3 rounded-2xl flex items-center justify-between shadow-sm';
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-indigo-600 dark:text-indigo-400 border border-slate-200/50 dark:border-slate-700/50">
+                            ${prod.name}
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm">${prod.name}</h4>
+                            <p class="text-[11px] text-slate-500">Stok: <span class="${currentStock <= prod.minStock ? 'text-rose-500 font-bold' : ''}">${currentStock}</span> | Prim: ₺${prod.commission}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="changeDailySale('${prod.id}', -1)" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center active:scale-90 transition font-bold text-sm">
+                            <i class="fa-solid fa-minus"></i>
+                        </button>
+                        <span class="w-7 text-center font-black text-sm ${sold > 0 ? 'text-indigo-600 dark:text-indigo-400' : ''}">${sold}</span>
+                        <button onclick="changeDailySale('${prod.id}', 1)" class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center active:scale-90 transition font-bold text-sm shadow-md shadow-indigo-600/30">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function changeDailySale(productId, delta) {
+            if (!appState.sales[appState.selectedDay]) {
+                appState.sales[appState.selectedDay] = {};
+            }
+            const current = appState.sales[appState.selectedDay][productId] || 0;
+            const newCount = Math.max(0, current + delta);
+            
+            // Check stock limits if increasing
+            if (delta > 0) {
+                const prod = appState.products.find(p => p.id === productId);
+                const totalSoldInMonth = getTotalSoldForProduct(productId);
+                if (prod.stock - totalSoldInMonth <= 0) {
+                    showToast(`⚠️ ${prod.name} stokta kalmadı!`);
+                    return;
+                }
+            }
+
+            appState.sales[appState.selectedDay][productId] = newCount;
+            saveStateToLocalStorage();
+            renderDailyProducts();
+        }
+
+        function clearDaySales() {
+            if (confirm(`${appState.selectedDay}. Günün satış verilerini sıfırlamak istediğinize emin misiniz?`)) {
+                delete appState.sales[appState.selectedDay];
+                saveStateToLocalStorage();
+                renderDailyProducts();
+                showToast("Günlük satışlar sıfırlandı.");
+            }
+        }
+
+        function getTotalSoldForProduct(productId) {
+            let total = 0;
+            Object.keys(appState.sales).forEach(day => {
+                total += (appState.sales[day][productId] || 0);
+            });
+            return total;
+        }
+
+        function renderStockProducts() {
+            const container = document.getElementById('stockProductsList');
+            container.innerHTML = '';
+
+            appState.products.forEach(prod => {
+                const totalSold = getTotalSoldForProduct(prod.id);
+                const remainingStock = prod.stock - totalSold;
+                const isCritical = remainingStock <= prod.minStock;
+
+                const card = document.createElement('div');
+                card.className = `glass-card p-4 rounded-3xl shadow-sm relative overflow-hidden border-l-4 ${isCritical ? 'border-l-rose-500' : 'border-l-emerald-500'}`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Model</span>
+                            <h3 class="text-lg font-black">${prod.name}</h3>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="openProductModal('${prod.id}')" class="p-2 text-slate-400 hover:text-indigo-500">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deleteProduct('${prod.id}')" class="p-2 text-slate-400 hover:text-rose-500">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs my-2 p-2.5 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50">
+                        <div>
+                            <span class="text-slate-500 block">Kalan Stok</span>
+                            <span class="font-extrabold text-sm ${isCritical ? 'text-rose-500 pulse-warning' : ''}">${remainingStock} / ${prod.stock}</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 block">Satılan</span>
+                            <span class="font-extrabold text-sm text-indigo-600 dark:text-indigo-400">${totalSold} Adet</span>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center text-xs pt-1 font-semibold">
+                        <span class="text-slate-500">Fiyat: ₺${prod.price.toLocaleString()}</span>
+                        <span class="text-amber-600 dark:text-amber-400">Prim: ₺${prod.commission}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function openProductModal(productId = null) {
+            const modal = document.getElementById('productModal');
+            const title = document.getElementById('modalProductTitle');
+            const form = document.getElementById('productForm');
+
+            if (productId) {
+                const prod = appState.products.find(p => p.id === productId);
+                title.textContent = "Ürün Düzenle";
+                document.getElementById('editProductId').value = prod.id;
+                document.getElementById('inputProdName').value = prod.name;
+                document.getElementById('inputProdStock').value = prod.stock;
+                document.getElementById('inputProdMinStock').value = prod.minStock;
+                document.getElementById('inputProdPrice').value = prod.price;
+                document.getElementById('inputProdCommission').value = prod.commission;
+            } else {
+                title.textContent = "Yeni Ürün Ekle";
+                form.reset();
+                document.getElementById('editProductId').value = '';
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeProductModal() {
+            document.getElementById('productModal').classList.add('hidden');
+        }
+
+        function saveProduct(e) {
+            e.preventDefault();
+            const id = document.getElementById('editProductId').value;
+            const name = document.getElementById('inputProdName').value.trim();
+            const stock = parseInt(document.getElementById('inputProdStock').value);
+            const minStock = parseInt(document.getElementById('inputProdMinStock').value);
+            const price = parseFloat(document.getElementById('inputProdPrice').value);
+            const commission = parseFloat(document.getElementById('inputProdCommission').value);
+
+            if (id) {
+                const index = appState.products.findIndex(p => p.id === id);
+                if (index !== -1) {
+                    appState.products[index] = { id, name, stock, minStock, price, commission };
+                }
+            } else {
+                const newId = 'p_' + Date.now();
+                appState.products.push({ id: newId, name, stock, minStock, price, commission });
+            }
+
+            saveStateToLocalStorage();
+            closeProductModal();
+            renderStockProducts();
+            renderDailyProducts();
+            showToast("Ürün bilgileri kaydedildi.");
+        }
+
+        function deleteProduct(id) {
+            if (confirm("Bu ürünü silmek istediğinize emin misiniz?")) {
+                appState.products = appState.products.filter(p => p.id !== id);
+                saveStateToLocalStorage();
+                renderStockProducts();
+                renderDailyProducts();
+                showToast("Ürün silindi.");
+            }
+        }
+
+        // Target Modal
+        function openTargetModal() {
+            document.getElementById('inputMonthlyTarget').value = appState.monthlyTarget;
+            document.getElementById('targetModal').classList.remove('hidden');
+        }
+        function closeTargetModal() {
+            document.getElementById('targetModal').classList.add('hidden');
+        }
+        function saveTarget() {
+            const val = parseInt(document.getElementById('inputMonthlyTarget').value);
+            if (val > 0) {
+                appState.monthlyTarget = val;
+                saveStateToLocalStorage();
+                closeTargetModal();
+                updateDashboard();
+                showToast("Hedef güncellendi.");
+            }
+        }
+
+        function updateDashboard() {
+            let totalSalesCount = 0;
+            let totalRevenue = 0;
+            let totalCommission = 0;
+            let totalStock = 0;
+            let criticalStockCount = 0;
+
+            appState.products.forEach(prod => {
+                const sold = getTotalSoldForProduct(prod.id);
+                totalSalesCount += sold;
+                totalRevenue += sold * prod.price;
+                totalCommission += sold * prod.commission;
+
+                const remaining = prod.stock - sold;
+                totalStock += remaining;
+                if (remaining <= prod.minStock) {
+                    criticalStockCount++;
+                }
+            });
+
+            // Update DOM Elements
+            document.getElementById('dashSalesCount').textContent = totalSalesCount;
+            document.getElementById('dashTargetCount').textContent = `/ ${appState.monthlyTarget} Adet`;
+            
+            const targetPct = Math.min(100, Math.round((totalSalesCount / appState.monthlyTarget) * 100));
+            document.getElementById('targetPercent').textContent = `%${targetPct}`;
+            document.getElementById('targetProgressBar').style.width = `${targetPct}%`;
+
+            document.getElementById('dashRevenue').textContent = `₺${totalRevenue.toLocaleString()}`;
+            document.getElementById('dashCommission').textContent = `₺${totalCommission.toLocaleString()}`;
+            document.getElementById('dashTotalStock').textContent = `${totalStock} Adet`;
+            document.getElementById('dashCriticalStock').textContent = `${criticalStockCount} Ürün`;
+
+            updateCharts();
+        }
+
+        function initCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+
+            // Trend Chart
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+            trendChartInstance = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 31}, (_, i) => `${i + 1}`),
+                    datasets: [{
+                        label: 'Satış Adedi',
+                        data: [],
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: textColor } },
+                        y: { grid: { color: 'rgba(148, 163, 184, 0.1)' }, ticks: { color: textColor, precision: 0 } }
+                    }
+                }
+            });
+
+            // Pie Chart
+            const ctxPie = document.getElementById('productPieChart').getContext('2d');
+            pieChartInstance = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#10b981', '#06b6d4', '#3b82f6', '#f59e0b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: textColor, font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // Bar Chart
+            const ctxBar = document.getElementById('stockBarChart').getContext('2d');
+            barChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Kalan Stok',
+                        data: [],
+                        backgroundColor: '#10b981',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: textColor } },
+                        y: { grid: { color: 'rgba(148, 163, 184, 0.1)' }, ticks: { color: textColor, precision: 0 } }
+                    }
+                }
+            });
+
+            updateCharts();
+        }
+
+        function updateCharts() {
+            if (!trendChartInstance) return;
+
+            // Daily trend data
+            const dailyData = [];
+            for (let day = 1; day <= 31; day++) {
+                let dayTotal = 0;
+                if (appState.sales[day]) {
+                    Object.values(appState.sales[day]).forEach(count => dayTotal += count);
+                }
+                dailyData.push(dayTotal);
+            }
+            trendChartInstance.data.datasets[0].data = dailyData;
+            trendChartInstance.update();
+
+            // Product distribution pie chart
+            const labels = [];
+            const salesData = [];
+            appState.products.forEach(p => {
+                const sold = getTotalSoldForProduct(p.id);
+                if (sold > 0) {
+                    labels.push(p.name);
+                    salesData.push(sold);
+                }
+            });
+            pieChartInstance.data.labels = labels.length ? labels : ['Satış Yok'];
+            pieChartInstance.data.datasets[0].data = salesData.length ? salesData : [1];
+            pieChartInstance.update();
+
+            // Stock levels bar chart
+            const prodNames = appState.products.map(p => p.name);
+            const prodStocks = appState.products.map(p => p.stock - getTotalSoldForProduct(p.id));
+            barChartInstance.data.labels = prodNames;
+            barChartInstance.data.datasets[0].data = prodStocks;
+            barChartInstance.update();
+        }
+
+        function renderReportsTable() {
+            const tbody = document.getElementById('reportTableBody');
+            tbody.innerHTML = '';
+
+            let grandTotalSales = 0;
+            let grandTotalRevenue = 0;
+            let grandTotalCommission = 0;
+
+            appState.products.forEach(prod => {
+                const sold = getTotalSoldForProduct(prod.id);
+                const revenue = sold * prod.price;
+                const commission = sold * prod.commission;
+
+                grandTotalSales += sold;
+                grandTotalRevenue += revenue;
+                grandTotalCommission += commission;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3 font-bold">${prod.name}</td>
+                    <td class="p-3 text-center">${sold}</td>
+                    <td class="p-3 text-right">₺${prod.price.toLocaleString()}</td>
+                    <td class="p-3 text-right font-bold text-indigo-600 dark:text-indigo-400">₺${revenue.toLocaleString()}</td>
+                    <td class="p-3 text-right text-amber-600 dark:text-amber-400">₺${commission.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Total Row
+            const totalTr = document.createElement('tr');
+            totalTr.className = 'bg-slate-100/80 dark:bg-slate-800/80 font-black';
+            totalTr.innerHTML = `
+                <td class="p-3">GENEL TOPLAM</td>
+                <td class="p-3 text-center">${grandTotalSales}</td>
+                <td class="p-3 text-right">-</td>
+                <td class="p-3 text-right text-indigo-600 dark:text-indigo-400">₺${grandTotalRevenue.toLocaleString()}</td>
+                <td class="p-3 text-right text-amber-600 dark:text-amber-400">₺${grandTotalCommission.toLocaleString()}</td>
+            `;
+            tbody.appendChild(totalTr);
+        }
+
+        // Export Excel File
+        function exportToExcel() {
+            const data = appState.products.map(prod => {
+                const sold = getTotalSoldForProduct(prod.id);
+                return {
+                    "Ürün / Model": prod.name,
+                    "Başlangıç Stoğu": prod.stock,
+                    "Kalan Stok": prod.stock - sold,
+                    "Toplam Satış (Adet)": sold,
+                    "Birim Fiyat (TL)": prod.price,
+                    "Toplam Ciro (TL)": sold * prod.price,
+                    "Kazanılan Prim (TL)": sold * prod.commission
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Satış Raporu");
+            XLSX.writeFile(workbook, `Satis_Takip_Raporu_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast("Excel raporu indirildi.");
+        }
+
+        // Export JSON Backup
+        function exportToJson() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `Satis_Yedek_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast("Yedek dosyası indirildi.");
+        }
+
+        // Import Backup
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    if (file.name.endsWith('.json')) {
+                        const importedState = JSON.parse(e.target.result);
+                        if (importedState.products) {
+                            appState = importedState;
+                            saveStateToLocalStorage();
+                            location.reload();
+                        }
+                    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.csv')) {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                        
+                        if(jsonData && jsonData.length > 0) {
+                            showToast("Excel verileri okundu!");
+                        }
+                    }
+                } catch(err) {
+                    alert("Dosya yükleme hatası: " + err.message);
+                }
+            };
+            
+            if (file.name.endsWith('.json')) {
+                reader.readAsText(file);
+            } else {
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        function resetDataConfirm() {
+            if (confirm("Tüm verileri silip varsayılan duruma getirmek istediğinize emin misiniz?")) {
+                localStorage.removeItem('satis_stok_app_state');
+                location.reload();
+            }
+        }
+
+        // PWA Modal Helpers
+        function openPwaModal() {
+            document.getElementById('pwaModal').classList.remove('hidden');
+        }
+        function closePwaModal() {
+            document.getElementById('pwaModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
